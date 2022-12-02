@@ -30,10 +30,13 @@
 */
 
 #include <ESP8266WiFi.h>
-#include <time.h>
+#include <TimeLib.h>
+#include <TimeAlarms.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
 
 #ifndef STASSID
 #define STASSID "XXXXXXXXXXXXXX" // TODO: replace with valid credentials
@@ -50,7 +53,9 @@ const char *hostname = HOSTNAME;
 ESP8266WebServer server(80);
 
 const int led = LED_BUILTIN;
-time_t now;
+
+WiFiUDP ntpUDP;
+NTPClient ntpClient(ntpUDP, "europe.pool.ntp.org", 0, 30 * 60 * 1000);
 
 void handleRoot() {
   digitalWrite(led, 0);
@@ -69,7 +74,7 @@ void handleRoot() {
       </head>\n\
       <body>\n\
         <h1>Matrix sign</h1>\n\
-        <p>Date: %s</p>\n\
+        <p>Date: %02d/%02d/%02d %02d:%02d:%02d</p>\n\
         <p>Uptime: %02d:%02d:%02d</p>\n\
         <form action='/msg' method='post'>\n\
           <label for='fname'>Message:</label><br>\n\
@@ -90,7 +95,7 @@ void handleRoot() {
         </form>\n\
       </body>\n\
     </html>",
-    ctime(&now),
+    day(), month(), year(), hour(), minute(), second(),
     hr, min % 60, sec % 60
   );
   server.send(200, "text/html", temp);
@@ -167,6 +172,19 @@ void handleSet() {
   server.send(302, "text/plain","");     
 }
 
+void SwitchOn() {
+  Serial.println("N");
+}
+
+void SwitchOff() {
+  Serial.println("X");
+}
+
+time_t getNtpTime() {
+  ntpClient.update();
+  return ntpClient.getEpochTime();
+}
+
 void setup(void) {
   pinMode(led, OUTPUT);
   digitalWrite(led, 0);
@@ -193,15 +211,15 @@ void setup(void) {
     Serial.println(hostname);
   }
 
-  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  Serial.print("Waiting for time");
-  while (!time(nullptr)) {
-    Serial.print(".");
-    delay(1000);
-  }
-  Serial.println("");
-  now = time(nullptr);
-  Serial.println(ctime(&now));
+  setSyncProvider(getNtpTime);
+  setSyncInterval(60 * 60);
+
+  ntpClient.begin();
+
+  // At my location in the UK, sunset varies between 3.53pm and 4.00pm during December,
+  // it's therefore not worth calculating the exact time of sunset
+  Alarm.alarmRepeat(16,0,0, SwitchOn);  // 4:30pm every day
+  Alarm.alarmRepeat(1,0,0, SwitchOff);  // 1:00am every day 
 
   server.on("/", handleRoot);
   server.on("/bright", handleBrightness);
@@ -216,4 +234,5 @@ void setup(void) {
 void loop(void) {
   server.handleClient();
   MDNS.update();
+  Alarm.delay(0);
 }
