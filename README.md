@@ -8,4 +8,4 @@ Provides web server interface to allow:
 
 ![image](https://user-images.githubusercontent.com/1058493/205345115-5524b5ef-33e5-4ca7-98e3-5336eaf934be.png)
 
-Also syncs to NTP to determine the time, and turns display on at 4.30pm and off at midnight.
+Also syncs to NTP to determine the time, and turns display on at 4.30pm and off at 1.00am.
